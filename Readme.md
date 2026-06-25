@@ -1,0 +1,137 @@
+# Home Automation System
+
+## Overview
+
+This project is a smart home automation system built using an ESP32 microcontroller and a Raspberry Pi as the central hub. The system monitors environmental conditions, allows remote control of connected devices, and stores sensor data for future analysis.
+
+## Features
+
+* Real-time monitoring of sensor data
+* Remote control of LEDs and servo motors
+* Historical data storage and retrieval
+* Web-based dashboard for visualization
+* MQTT-based communication between devices
+* Real-time updates between devices and dashboard
+
+## Technology Stack
+
+### Hardware
+
+* ESP32
+* Raspberry Pi
+* LEDs
+* Servo Motor
+* Environmental Sensors
+
+### Backend
+
+* Rust
+* Axum
+* Tokio
+* MQTT Client
+* PostgreSQL
+* SQLx
+
+### Frontend
+
+* HTML
+* CSS
+* JavaScript
+
+### Communication
+
+* MQTT
+* WebSockets
+
+## System Architecture
+
+### ESP32
+
+The ESP32 collects sensor readings and publishes them to the MQTT broker. It also subscribes to control topics to receive commands from the dashboard.
+
+### Raspberry Pi / Server
+
+The server is built with Rust and is responsible for:
+
+* Receiving sensor data from MQTT topics
+* Storing data in PostgreSQL
+* Managing device control commands
+* Serving the web dashboard
+* Broadcasting real-time updates through WebSockets
+
+## Project Structure
+
+```text
+HomeAutomation/
+├── mqqt_client/
+│   ├── .pio/
+│   ├── .vscode/
+│   ├── include/
+│   ├── lib/
+│   ├── src/
+│   ├── test/
+│   └── platformio.ini
+│
+├── server/
+│   ├── src/
+│   ├── target/
+│   ├── Cargo.toml
+│   └── Cargo.lock
+│
+└── README.md
+```
+
+## Installation
+
+### Clone the Repository
+
+```bash
+git clone <repository-url>
+cd Home-Automation-System
+```
+
+### Configure PostgreSQL
+
+Create a PostgreSQL database and update your environment variables.
+
+```env
+DATABASE_URL=postgres://username:password@localhost/home_automation
+MQTT_BROKER=mqtt://localhost:1883
+```
+
+### Build the Rust Backend
+
+```bash
+cargo build --release
+```
+
+### Run the Backend Server
+
+```bash
+cargo run
+```
+
+### Upload ESP32 Firmware
+
+Open the Arduino IDE, configure Wi-Fi and MQTT settings, then upload the firmware to the ESP32.
+
+## Dashboard Features
+
+* Live sensor monitoring
+* Device control panel
+* Historical data visualization
+* Custom date-range queries
+* Real-time device status updates
+
+## Future Improvements
+
+* Mobile application
+* User authentication
+* Role-based access control
+* Automation rules and scheduling
+* Energy usage analytics
+* Voice assistant integration
+
+## License
+
+This project is intended for educational and research purposes.
