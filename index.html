@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32 Sensor Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ===== GRAFANA DARK THEME ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: #0a0e1a;
+            color: #d4d7de;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ===== TOP BAR ===== */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: #151b2b;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid #2a3040;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 20px;
+            color: #f0f2f5;
+        }
+
+        .logo i {
+            color: #f5a623;
+            font-size: 24px;
+        }
+
+        .status-indicators {
+            display: flex;
+            gap: 18px;
+            font-size: 13px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #1e2538;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #2a3040;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.online { background: #10b981; box-shadow: 0 0 8px #10b98166; }
+        .status-dot.offline { background: #ef4444; }
+
+        .time-display {
+            font-size: 14px;
+            color: #9ca3af;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== DASHBOARD GRID ===== */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 18px 20px;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            font-size: 20px;
+            opacity: 0.7;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #f0f2f5;
+            margin-bottom: 4px;
+        }
+
+        .stat-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #1e2538;
+            padding-top: 8px;
+        }
+
+        .trend-up { color: #10b981; }
+        .trend-down { color: #ef4444; }
+
+        /* ===== CHARTS ===== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .chart-card:hover {
+            border-color: #3b82f6;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .chart-wrapper {
+            height: 180px;
+            position: relative;
+        }
+
+        /* ===== CONTROLS ===== */
+        .controls-section {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .controls-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #f0f2f5;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .control-btn {
+            background: #1e2538;
+            border: 1px solid #2a3040;
+            color: #d4d7de;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .control-btn:hover {
+            background: #2a3040;
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+        }
+
+        .control-btn.primary {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+
+        .control-btn.primary:hover {
+            background: #2563eb;
+        }
+
+        .control-btn.success {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .control-btn.success:hover {
+            background: #059669;
+        }
+
+        .control-btn.danger {
+            background: #ef4444;
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .control-btn.danger:hover {
+            background: #dc2626;
+        }
+
+        .control-btn.warning {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+        }
+
+        .control-btn.warning:hover {
+            background: #d97706;
+        }
+
+        .control-btn i {
+            font-size: 14px;
+        }
+
+        /* ===== MQTT MONITOR ===== */
+        .mqtt-section {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 20px 24px;
+        }
+
+        .mqtt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .mqtt-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #f0f2f5;
+        }
+
+        .mqtt-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .mqtt-controls button {
+            background: #1e2538;
+            border: 1px solid #2a3040;
+            color: #d4d7de;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .mqtt-controls button:hover {
+            background: #2a3040;
+        }
+
+        .mqtt-terminal {
+            background: #0a0e1a;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border: 1px solid #1e2538;
+        }
+
+        .mqtt-line {
+            display: flex;
+            gap: 16px;
+            padding: 4px 0;
+            border-bottom: 1px solid #111827;
+            font-size: 12px;
+        }
+
+        .mqtt-line .time {
+            color: #6b7280;
+            min-width: 80px;
+        }
+
+        .mqtt-line .topic {
+            color: #60a5fa;
+            min-width: 120px;
+        }
+
+        .mqtt-line .payload {
+            color: #d4d7de;
+            flex: 1;
+        }
+
+        .mqtt-line .qos {
+            color: #f59e0b;
+            min-width: 40px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1200px) {
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .topbar { flex-direction: column; align-items: stretch; }
+            .status-indicators { flex-wrap: wrap; }
+            .controls-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .controls-grid { grid-template-columns: 1fr; }
+            .stat-value { font-size: 22px; }
+        }
+
+        /* Scrollbar */
+        .mqtt-terminal::-webkit-scrollbar {
+            width: 4px;
+        }
+        .mqtt-terminal::-webkit-scrollbar-track {
+            background: #0a0e1a;
+        }
+        .mqtt-terminal::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="logo">
+                <i class="fas fa-microchip"></i>
+                <span>ESP32 Monitor</span>
+            </div>
+        </div>
+        <div class="status-indicators">
+            <div class="status-item">
+                <span class="status-dot online"></span>
+                <span>MQTT Connected</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot online"></span>
+                <span>ESP32 Online</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot online"></span>
+                <span>Backend</span>
+            </div>
+            <span class="time-display" id="currentTime">--:--:--</span>
+        </div>
+    </header>
+
+    <!-- STAT CARDS -->
+    <div class="dashboard-grid" id="statCards">
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Temperature</span>
+                <i class="fas fa-thermometer-half stat-icon" style="color: #f59e0b;"></i>
+            </div>
+            <div class="stat-value" id="tempValue">--</div>
+            <div class="stat-footer">
+                <span>Min: <span id="tempMin">--</span>°C</span>
+                <span>Max: <span id="tempMax">--</span>°C</span>
+                <span class="trend-up"><i class="fas fa-arrow-up"></i> 0.5°C</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Pressure</span>
+                <i class="fas fa-compress-alt stat-icon" style="color: #8b5cf6;"></i>
+            </div>
+            <div class="stat-value" id="presValue">--</div>
+            <div class="stat-footer">
+                <span>Min: <span id="presMin">--</span>hPa</span>
+                <span>Max: <span id="presMax">--</span>hPa</span>
+                <span class="trend-down"><i class="fas fa-arrow-down"></i> 0.2hPa</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Air Quality</span>
+                <i class="fas fa-wind stat-icon" style="color: #10b981;"></i>
+            </div>
+            <div class="stat-value" id="airValue">--</div>
+            <div class="stat-footer">
+                <span>Good</span>
+                <span>PM2.5: 12µg</span>
+                <span class="trend-up"><i class="fas fa-arrow-up"></i> 2%</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Light</span>
+                <i class="fas fa-sun stat-icon" style="color: #fbbf24;"></i>
+            </div>
+            <div class="stat-value" id="lightValue">--</div>
+            <div class="stat-footer">
+                <span>Min: <span id="lightMin">--</span>lux</span>
+                <span>Max: <span id="lightMax">--</span>lux</span>
+                <span class="trend-up"><i class="fas fa-arrow-up"></i> 15lux</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-thermometer-half" style="margin-right: 6px;"></i>Temperature</div>
+            <div class="chart-wrapper"><canvas id="tempChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-compress-alt" style="margin-right: 6px;"></i>Pressure</div>
+            <div class="chart-wrapper"><canvas id="presChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-wind" style="margin-right: 6px;"></i>Air Quality</div>
+            <div class="chart-wrapper"><canvas id="airChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-sun" style="margin-right: 6px;"></i>Light</div>
+            <div class="chart-wrapper"><canvas id="lightChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls-section">
+        <div class="controls-header">
+            <h3><i class="fas fa-sliders-h" style="margin-right: 8px;"></i>Device Controls</h3>
+            <span style="font-size: 12px; color: #6b7280;">MQTT: esp/cmd</span>
+        </div>
+        <div class="controls-grid">
+            <button class="control-btn primary" data-cmd="LIGHT_ON"><i class="fas fa-lightbulb"></i> Lights ON</button>
+            <button class="control-btn" data-cmd="LIGHT_OFF"><i class="fas fa-lightbulb"></i> Lights OFF</button>
+            <button class="control-btn success" data-cmd="FAN_ON"><i class="fas fa-fan"></i> Fan ON</button>
+            <button class="control-btn" data-cmd="FAN_OFF"><i class="fas fa-fan"></i> Fan OFF</button>
+            <button class="control-btn warning" data-cmd="RESTART"><i class="fas fa-sync-alt"></i> Restart ESP32</button>
+            <button class="control-btn danger" data-cmd="STOP"><i class="fas fa-stop-circle"></i> Emergency Stop</button>
+        </div>
+    </div>
+
+    <!-- MQTT MONITOR -->
+    <div class="mqtt-section">
+        <div class="mqtt-header">
+            <h3><i class="fas fa-exchange-alt" style="margin-right: 8px;"></i>MQTT Monitor</h3>
+            <div class="mqtt-controls">
+                <span style="font-size: 12px; color: #6b7280;">Topic: esp/sensor</span>
+                <button id="clearMqtt"><i class="fas fa-eraser"></i> Clear</button>
+                <button id="pauseMqtt"><i class="fas fa-pause"></i> Pause</button>
+            </div>
+        </div>
+        <div class="mqtt-terminal" id="mqttTerminal">
+            <div class="mqtt-line">
+                <span class="time">12:00:00</span>
+                <span class="topic">esp/sensor</span>
+                <span class="payload">Temperature: 22.5°C</span>
+                <span class="qos">QoS 1</span>
+            </div>
+            <div class="mqtt-line">
+                <span class="time">12:00:05</span>
+                <span class="topic">esp/cmd</span>
+                <span class="payload">LIGHT_ON</span>
+                <span class="qos">QoS 0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== MAIN APPLICATION =====
+        (function() {
+            'use strict';
+
+            // ===== SENSOR DATA =====
+            const sensorData = {
+                temperature: 22.5,
+                pressure: 1012,
+                airQuality: 82,
+                light: 340
+            };
+
+            // Min/Max tracking
+            const minMax = {
+                temperature: { min: 20, max: 25 },
+                pressure: { min: 1005, max: 1020 },
+                light: { min: 200, max: 500 }
+            };
+
+            // ===== TIME =====
+            function updateClock() {
+                const now = new Date();
+                document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // ===== CHARTS =====
+            const chartConfigs = {
+                tempChart: { label: 'Temperature °C', color: '#f59e0b', unit: '°C' },
+                presChart: { label: 'Pressure hPa', color: '#8b5cf6', unit: 'hPa' },
+                airChart: { label: 'Air Quality', color: '#10b981', unit: 'AQI' },
+                lightChart: { label: 'Light lux', color: '#fbbf24', unit: 'lux' }
+            };
+
+            const charts = {};
+
+            function initChart(canvasId, config) {
+                const ctx = document.getElementById(canvasId)?.getContext('2d');
+                if (!ctx) return null;
+
+                const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+                gradient.addColorStop(0, config.color + '50');
+                gradient.addColorStop(1, config.color + '05');
+
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: Array(30).fill(''),
+                        datasets: [{
+                            label: config.label,
+                            data: Array(30).fill(0),
+                            borderColor: config.color,
+                            backgroundColor: gradient,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 1.5,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y.toFixed(1) + ' ' + config.unit;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: { 
+                                display: true,
+                                grid: { color: '#1e2538', drawBorder: false },
+                                ticks: { color: '#6b7280', font: { size: 9 } }
+                            }
+                        },
+                        animation: { duration: 200 }
+                    }
+                });
+                return chart;
+            }
+
+            // Initialize all charts
+            Object.keys(chartConfigs).forEach(id => {
+                charts[id] = initChart(id, chartConfigs[id]);
+            });
+
+            function updateChart(chartId, value) {
+                const chart = charts[chartId];
+                if (!chart) return;
+                const data = chart.data.datasets[0].data;
+                data.push(value);
+                if (data.length > 30) data.shift();
+                chart.update('none');
+            }
+
+            // ===== UPDATE UI =====
+            function updateUI() {
+                // Update stat values
+                document.getElementById('tempValue').textContent = sensorData.temperature.toFixed(1) + '°C';
+                document.getElementById('presValue').textContent = sensorData.pressure.toFixed(1) + ' hPa';
+                document.getElementById('airValue').textContent = sensorData.airQuality.toFixed(0) + ' AQI';
+                document.getElementById('lightValue').textContent = sensorData.light.toFixed(0) + ' lux';
+
+                // Update min/max
+                document.getElementById('tempMin').textContent = minMax.temperature.min.toFixed(1);
+                document.getElementById('tempMax').textContent = minMax.temperature.max.toFixed(1);
+                document.getElementById('presMin').textContent = minMax.pressure.min.toFixed(1);
+                document.getElementById('presMax').textContent = minMax.pressure.max.toFixed(1);
+                document.getElementById('lightMin').textContent = minMax.light.min.toFixed(0);
+                document.getElementById('lightMax').textContent = minMax.light.max.toFixed(0);
+
+                // Update charts
+                updateChart('tempChart', sensorData.temperature);
+                updateChart('presChart', sensorData.pressure);
+                updateChart('airChart', sensorData.airQuality);
+                updateChart('lightChart', sensorData.light);
+            }
+
+            // ===== SIMULATE SENSOR DATA =====
+            function simulateSensor() {
+                // Generate realistic sensor variations
+                sensorData.temperature = 20 + Math.random() * 8;
+                sensorData.pressure = 1005 + Math.random() * 20;
+                sensorData.airQuality = 50 + Math.random() * 50;
+                sensorData.light = 200 + Math.random() * 300;
+
+                // Update min/max
+                minMax.temperature.min = Math.min(minMax.temperature.min, sensorData.temperature);
+                minMax.temperature.max = Math.max(minMax.temperature.max, sensorData.temperature);
+                minMax.pressure.min = Math.min(minMax.pressure.min, sensorData.pressure);
+                minMax.pressure.max = Math.max(minMax.pressure.max, sensorData.pressure);
+                minMax.light.min = Math.min(minMax.light.min, sensorData.light);
+                minMax.light.max = Math.max(minMax.light.max, sensorData.light);
+
+                updateUI();
+
+                // Add MQTT message
+                if (!mqttPaused) {
+                    const topics = [
+                        `Temperature: ${sensorData.temperature.toFixed(1)}°C`,
+                        `Pressure: ${sensorData.pressure.toFixed(1)}hPa`,
+                        `Air Quality: ${sensorData.airQuality.toFixed(0)}AQI`,
+                        `Light: ${sensorData.light.toFixed(0)}lux`
+                    ];
+                    const msg = topics[Math.floor(Math.random() * topics.length)];
+                    addMqttMessage('esp/sensor', msg);
+                }
+            }
+
+            // ===== MQTT MONITOR =====
+            let mqttPaused = false;
+
+            function addMqttMessage(topic, payload, qos = 1) {
+                const terminal = document.getElementById('mqttTerminal');
+                const time = new Date().toLocaleTimeString();
+                const line = document.createElement('div');
+                line.className = 'mqtt-line';
+                line.innerHTML = `
+                    <span class="time">${time}</span>
+                    <span class="topic">${topic}</span>
+                    <span class="payload">${payload}</span>
+                    <span class="qos">QoS ${qos}</span>
+                `;
+                terminal.prepend(line);
+                if (terminal.children.length > 50) {
+                    terminal.removeChild(terminal.lastChild);
+                }
+            }
+
+            // ===== CONTROLS =====
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cmd = this.dataset.cmd;
+                    const label = this.textContent.trim();
+                    addMqttMessage('esp/cmd', cmd);
+                    // Visual feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => { this.style.transform = 'scale(1)'; }, 100);
+                    // Log
+                    console.log(`Command sent: ${cmd}`);
+                });
+            });
+
+            // ===== MQTT CONTROLS =====
+            document.getElementById('clearMqtt').addEventListener('click', () => {
+                document.getElementById('mqttTerminal').innerHTML = '';
+            });
+
+            document.getElementById('pauseMqtt').addEventListener('click', function() {
+                mqttPaused = !mqttPaused;
+                this.innerHTML = mqttPaused ? '<i class="fas fa-play"></i> Resume' : '<i class="fas fa-pause"></i> Pause';
+            });
+
+            // ===== INIT =====
+            // Initial data load
+            updateUI();
+
+            // Start simulation
+            setInterval(simulateSensor, 1500);
+
+            // Initial MQTT messages
+            setTimeout(() => {
+                addMqttMessage('esp/sensor', 'Temperature: 22.5°C');
+                addMqttMessage('esp/sensor', 'Pressure: 1012.3hPa');
+                addMqttMessage('esp/sensor', 'Air Quality: 82AQI');
+            }, 500);
+
+            console.log('🚀 ESP32 Dashboard ready!');
+            console.log('📡 MQTT Broker: 100.84.169.93:1883');
+            console.log('📊 Sensors: Temperature, Pressure, Air Quality, Light');
+
+        })();
+    </script>
+
+</body>
+</html>
