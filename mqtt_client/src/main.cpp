@@ -39,12 +39,36 @@ void reconnect() {
 
         if (client.connect("Esp32Client")) {
             Serial.println("Connected...");
+
+            // Client Subsribe to a topic from the broker
+            client.subscribe("esp/cmd");
         } else {
             Serial.print("Failed, rc=");
             Serial.println(client.state());
             delay(5000);
         }
     }
+}
+
+void callback(char * topic, byte * payload,unsigned int length){
+    String message;
+
+    for (int i=0;i<length;i++){
+        message+=(char)payload[i];
+    }
+
+    Serial.print(message);
+   if(String(topic) == "esp/cmd"){
+    Serial.print("Received Message: " +message);
+    parseStr(message);
+   }
+}
+
+void parseStr(const String& str){
+    int commaIndex = str.indexOf(",");
+
+    String sensorName = str.substring(0,commandIndex);
+    int pinState = str.substring(command + 1).toInt();
 }
 
 
