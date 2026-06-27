@@ -1,0 +1,8 @@
+# Rust
+target/
+
+# Environment variables
+.env
+
+# Cargo build output
+**/target/
