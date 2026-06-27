@@ -77,6 +77,8 @@ HomeAutomation/
 │   ├── target/
 │   ├── Cargo.toml
 │   └── Cargo.lock
+|
+|──Index.html
 │
 └── README.md
 ```
