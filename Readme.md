@@ -79,6 +79,7 @@ HomeAutomation/
 │   └── Cargo.lock
 |
 |──Index.html
+|──simulation.html
 │
 └── README.md
 ```
@@ -88,8 +89,8 @@ HomeAutomation/
 ### Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd Home-Automation-System
+git clone https://github.com/newton-f150/Home-Automation.git
+cd Home-Automation
 ```
 
 ### Configure PostgreSQL
