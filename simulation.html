@@ -395,26 +395,18 @@
 </head>
 <body>
 
-    <!-- TOP BAR -->
+     <!-- TOP BAR -->
     <header class="topbar">
         <div class="topbar-left">
             <div class="logo">
                 <i class="fas fa-microchip"></i>
-                <span>ESP32 Monitor</span>
+                <span>Remote Monitoring Simulation</span>
             </div>
         </div>
         <div class="status-indicators">
-            <div class="status-item">
-                <span class="status-dot online"></span>
-                <span>MQTT Connected</span>
-            </div>
-            <div class="status-item">
-                <span class="status-dot online"></span>
-                <span>ESP32 Online</span>
-            </div>
-            <div class="status-item">
-                <span class="status-dot online"></span>
-                <span>Backend</span>
+             <div class="status-item">
+                <span class="status-dot online" id="apiStatus"></span>
+                <span>API Status: <span id="apiStatusText">Online</span></span>
             </div>
             <span class="time-display" id="currentTime">--:--:--</span>
         </div>
@@ -751,9 +743,9 @@
                 addMqttMessage('esp/sensor', 'Air Quality: 82AQI');
             }, 500);
 
-            console.log('🚀 ESP32 Dashboard ready!');
-            console.log('📡 MQTT Broker: 100.84.169.93:1883');
-            console.log('📊 Sensors: Temperature, Pressure, Air Quality, Light');
+            console.log('ESP32 Dashboard ready!');
+            console.log('MQTT Broker: 100.84.169.93:1883');
+            console.log('Sensors: Temperature, Pressure, Air Quality, Light');
 
         })();
     </script>
