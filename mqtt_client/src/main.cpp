@@ -64,12 +64,12 @@ void callback(char * topic, byte * payload,unsigned int length){
    }
 }
 
-// void parseStr(const String& str){
-//     int commaIndex = str.indexOf(",");
+void parseStr(const String& str){
+    int commaIndex = str.indexOf(",");
 
-//     String sensorName = str.substring(0,commandIndex);
-//     int pinState = str.substring(command + 1).toInt();
-// }
+    String sensorName = str.substring(0,commandIndex);
+    int pinState = str.substring(command + 1).toInt();
+}
 
 
 void setup() {
