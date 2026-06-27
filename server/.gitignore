@@ -3,6 +3,7 @@ target/
 
 # Environment variables
 .env
+.env.example
 
 # Cargo build output
 **/target/
