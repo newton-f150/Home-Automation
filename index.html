@@ -81,6 +81,7 @@
 
         .status-dot.online { background: #10b981; box-shadow: 0 0 8px #10b98166; }
         .status-dot.offline { background: #ef4444; }
+        .status-dot.warning { background: #f59e0b; }
 
         .time-display {
             font-size: 14px;
@@ -152,7 +153,7 @@
         /* ===== CHARTS ===== */
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -360,6 +361,12 @@
             min-width: 40px;
         }
 
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+        }
+
         /* ===== RESPONSIVE ===== */
         @media (max-width: 1200px) {
             .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
@@ -405,16 +412,16 @@
         </div>
         <div class="status-indicators">
             <div class="status-item">
-                <span class="status-dot online"></span>
-                <span>MQTT Connected</span>
+                <span class="status-dot online" id="mqttStatus"></span>
+                <span>MQTT <span id="mqttStatusText">Connected</span></span>
             </div>
             <div class="status-item">
-                <span class="status-dot online"></span>
-                <span>ESP32 Online</span>
+                <span class="status-dot online" id="espStatus"></span>
+                <span>ESP32 <span id="espStatusText">Online</span></span>
             </div>
             <div class="status-item">
-                <span class="status-dot online"></span>
-                <span>Backend</span>
+                <span class="status-dot online" id="apiStatus"></span>
+                <span>API <span id="apiStatusText">Online</span></span>
             </div>
             <span class="time-display" id="currentTime">--:--:--</span>
         </div>
@@ -431,7 +438,7 @@
             <div class="stat-footer">
                 <span>Min: <span id="tempMin">--</span>°C</span>
                 <span>Max: <span id="tempMax">--</span>°C</span>
-                <span class="trend-up"><i class="fas fa-arrow-up"></i> 0.5°C</span>
+                <span class="trend-up" id="tempTrend"><i class="fas fa-arrow-up"></i> 0.0°C</span>
             </div>
         </div>
 
@@ -444,7 +451,7 @@
             <div class="stat-footer">
                 <span>Min: <span id="presMin">--</span>hPa</span>
                 <span>Max: <span id="presMax">--</span>hPa</span>
-                <span class="trend-down"><i class="fas fa-arrow-down"></i> 0.2hPa</span>
+                <span class="trend-up" id="presTrend"><i class="fas fa-arrow-up"></i> 0.0hPa</span>
             </div>
         </div>
 
@@ -455,9 +462,9 @@
             </div>
             <div class="stat-value" id="airValue">--</div>
             <div class="stat-footer">
-                <span>Good</span>
-                <span>PM2.5: 12µg</span>
-                <span class="trend-up"><i class="fas fa-arrow-up"></i> 2%</span>
+                <span>Status: <span id="airStatus">Good</span></span>
+                <span>PM2.5: <span id="airPM">--</span>µg</span>
+                <span class="trend-up" id="airTrend"><i class="fas fa-arrow-up"></i> 0%</span>
             </div>
         </div>
 
@@ -470,7 +477,7 @@
             <div class="stat-footer">
                 <span>Min: <span id="lightMin">--</span>lux</span>
                 <span>Max: <span id="lightMax">--</span>lux</span>
-                <span class="trend-up"><i class="fas fa-arrow-up"></i> 15lux</span>
+                <span class="trend-up" id="lightTrend"><i class="fas fa-arrow-up"></i> 0lux</span>
             </div>
         </div>
     </div>
@@ -522,48 +529,237 @@
             </div>
         </div>
         <div class="mqtt-terminal" id="mqttTerminal">
-            <div class="mqtt-line">
-                <span class="time">12:00:00</span>
-                <span class="topic">esp/sensor</span>
-                <span class="payload">Temperature: 22.5°C</span>
-                <span class="qos">QoS 1</span>
-            </div>
-            <div class="mqtt-line">
-                <span class="time">12:00:05</span>
-                <span class="topic">esp/cmd</span>
-                <span class="payload">LIGHT_ON</span>
-                <span class="qos">QoS 0</span>
-            </div>
+            <div class="loading">Waiting for data...</div>
         </div>
     </div>
 
     <script>
+        // ===== CONFIGURATION =====
+        const API_CONFIG = {
+            baseUrl: 'http://localhost:3000/api', // Update with your Rust backend URL
+            endpoints: {
+                sensors: '/sensors',
+                control: '/control',
+                status: '/status'
+            }
+        };
+
         // ===== MAIN APPLICATION =====
         (function() {
             'use strict';
 
-            // ===== SENSOR DATA =====
-            const sensorData = {
-                temperature: 22.5,
-                pressure: 1012,
-                airQuality: 82,
-                light: 340
+            // ===== STATE =====
+            const state = {
+                sensorData: {
+                    temperature: 0,
+                    pressure: 0,
+                    airQuality: 0,
+                    light: 0
+                },
+                minMax: {
+                    temperature: { min: Infinity, max: -Infinity },
+                    pressure: { min: Infinity, max: -Infinity },
+                    light: { min: Infinity, max: -Infinity }
+                },
+                history: {
+                    temperature: [],
+                    pressure: [],
+                    airQuality: [],
+                    light: []
+                },
+                mqttPaused: false,
+                isConnected: false
             };
 
-            // Min/Max tracking
-            const minMax = {
-                temperature: { min: 20, max: 25 },
-                pressure: { min: 1005, max: 1020 },
-                light: { min: 200, max: 500 }
+            const MAX_HISTORY = 30;
+
+            // ===== API CLIENT =====
+            const api = {
+                async fetchSensors() {
+                    try {
+                        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.sensors}`);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Failed to fetch sensor data:', error);
+                        return null;
+                    }
+                },
+
+                async sendControl(command) {
+                    try {
+                        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.control}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command })
+                        });
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Failed to send control command:', error);
+                        return null;
+                    }
+                },
+
+                async fetchStatus() {
+                    try {
+                        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.status}`);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Failed to fetch status:', error);
+                        return null;
+                    }
+                }
             };
 
-            // ===== TIME =====
-            function updateClock() {
-                const now = new Date();
-                document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+            // ===== WEBSOCKET CONNECTION =====
+            let ws = null;
+            let wsReconnectTimer = null;
+
+            function connectWebSocket() {
+                try {
+                    const wsUrl = API_CONFIG.baseUrl.replace('http', 'ws') + '/ws';
+                    ws = new WebSocket(wsUrl);
+
+                    ws.onopen = function() {
+                        console.log('WebSocket connected');
+                        updateStatus('ws', true);
+                        addMqttMessage('system', 'WebSocket connected');
+                    };
+
+                    ws.onmessage = function(event) {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'sensor') {
+                                updateSensorData(data.payload);
+                            } else if (data.type === 'mqtt') {
+                                addMqttMessage(data.topic || 'mqtt', data.payload);
+                            }
+                        } catch (e) {
+                            console.error('WebSocket message error:', e);
+                        }
+                    };
+
+                    ws.onclose = function() {
+                        console.log('WebSocket disconnected');
+                        updateStatus('ws', false);
+                        addMqttMessage('system', 'WebSocket disconnected - reconnecting...');
+                        scheduleReconnect();
+                    };
+
+                    ws.onerror = function(error) {
+                        console.error('WebSocket error:', error);
+                        updateStatus('ws', false);
+                    };
+                } catch (error) {
+                    console.error('WebSocket connection error:', error);
+                    scheduleReconnect();
+                }
             }
-            setInterval(updateClock, 1000);
-            updateClock();
+
+            function scheduleReconnect() {
+                if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = setTimeout(() => {
+                    console.log('Attempting WebSocket reconnect...');
+                    connectWebSocket();
+                }, 3000);
+            }
+
+            // ===== UPDATE SENSOR DATA =====
+            function updateSensorData(data) {
+                // Update values
+                if (data.temperature !== undefined) {
+                    state.sensorData.temperature = data.temperature;
+                    updateMinMax('temperature', data.temperature);
+                }
+                if (data.pressure !== undefined) {
+                    state.sensorData.pressure = data.pressure;
+                    updateMinMax('pressure', data.pressure);
+                }
+                if (data.airQuality !== undefined) {
+                    state.sensorData.airQuality = data.airQuality;
+                }
+                if (data.light !== undefined) {
+                    state.sensorData.light = data.light;
+                    updateMinMax('light', data.light);
+                }
+
+                // Update history
+                if (data.temperature !== undefined) {
+                    state.history.temperature.push(data.temperature);
+                    if (state.history.temperature.length > MAX_HISTORY) state.history.temperature.shift();
+                }
+                if (data.pressure !== undefined) {
+                    state.history.pressure.push(data.pressure);
+                    if (state.history.pressure.length > MAX_HISTORY) state.history.pressure.shift();
+                }
+                if (data.airQuality !== undefined) {
+                    state.history.airQuality.push(data.airQuality);
+                    if (state.history.airQuality.length > MAX_HISTORY) state.history.airQuality.shift();
+                }
+                if (data.light !== undefined) {
+                    state.history.light.push(data.light);
+                    if (state.history.light.length > MAX_HISTORY) state.history.light.shift();
+                }
+
+                updateUI();
+                updateCharts();
+            }
+
+            function updateMinMax(sensor, value) {
+                const mm = state.minMax[sensor];
+                if (!mm) return;
+                if (value < mm.min) mm.min = value;
+                if (value > mm.max) mm.max = value;
+            }
+
+            // ===== UPDATE UI =====
+            function updateUI() {
+                const data = state.sensorData;
+                const mm = state.minMax;
+
+                // Temperature
+                document.getElementById('tempValue').textContent = data.temperature.toFixed(1) + '°C';
+                document.getElementById('tempMin').textContent = mm.temperature.min.toFixed(1);
+                document.getElementById('tempMax').textContent = mm.temperature.max.toFixed(1);
+                updateTrend('tempTrend', data.temperature);
+
+                // Pressure
+                document.getElementById('presValue').textContent = data.pressure.toFixed(1) + ' hPa';
+                document.getElementById('presMin').textContent = mm.pressure.min.toFixed(1);
+                document.getElementById('presMax').textContent = mm.pressure.max.toFixed(1);
+                updateTrend('presTrend', data.pressure);
+
+                // Air Quality
+                document.getElementById('airValue').textContent = data.airQuality.toFixed(0) + ' AQI';
+                const airStatus = data.airQuality < 50 ? 'Good' : data.airQuality < 100 ? 'Moderate' : 'Unhealthy';
+                document.getElementById('airStatus').textContent = airStatus;
+                document.getElementById('airPM').textContent = (data.airQuality * 0.15).toFixed(1);
+                updateTrend('airTrend', data.airQuality);
+
+                // Light
+                document.getElementById('lightValue').textContent = data.light.toFixed(0) + ' lux';
+                document.getElementById('lightMin').textContent = mm.light.min.toFixed(0);
+                document.getElementById('lightMax').textContent = mm.light.max.toFixed(0);
+                updateTrend('lightTrend', data.light);
+            }
+
+            function updateTrend(elementId, currentValue) {
+                const element = document.getElementById(elementId);
+                if (!element) return;
+                // Simple trend calculation based on last two values
+                const key = elementId.replace('Trend', '');
+                const history = state.history[key.toLowerCase()];
+                if (history && history.length >= 2) {
+                    const prev = history[history.length - 2];
+                    const diff = currentValue - prev;
+                    const arrow = diff >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const className = diff >= 0 ? 'trend-up' : 'trend-down';
+                    element.className = className;
+                    element.innerHTML = `<i class="fas ${arrow}"></i> ${Math.abs(diff).toFixed(1)}`;
+                }
+            }
 
             // ===== CHARTS =====
             const chartConfigs = {
@@ -586,10 +782,10 @@
                 const chart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: Array(30).fill(''),
+                        labels: Array(MAX_HISTORY).fill(''),
                         datasets: [{
                             label: config.label,
-                            data: Array(30).fill(0),
+                            data: Array(MAX_HISTORY).fill(0),
                             borderColor: config.color,
                             backgroundColor: gradient,
                             tension: 0.4,
@@ -613,7 +809,7 @@
                         },
                         scales: {
                             x: { display: false },
-                            y: { 
+                            y: {
                                 display: true,
                                 grid: { color: '#1e2538', drawBorder: false },
                                 ticks: { color: '#6b7280', font: { size: 9 } }
@@ -630,75 +826,67 @@
                 charts[id] = initChart(id, chartConfigs[id]);
             });
 
-            function updateChart(chartId, value) {
-                const chart = charts[chartId];
-                if (!chart) return;
-                const data = chart.data.datasets[0].data;
-                data.push(value);
-                if (data.length > 30) data.shift();
-                chart.update('none');
+            function updateCharts() {
+                const chartMap = {
+                    tempChart: 'temperature',
+                    presChart: 'pressure',
+                    airChart: 'airQuality',
+                    lightChart: 'light'
+                };
+
+                Object.keys(chartMap).forEach(chartId => {
+                    const chart = charts[chartId];
+                    if (!chart) return;
+                    const sensorKey = chartMap[chartId];
+                    const data = state.history[sensorKey] || [];
+                    const chartData = chart.data.datasets[0].data;
+                    
+                    // Fill with zeros if not enough data
+                    while (chartData.length < MAX_HISTORY) {
+                        chartData.push(0);
+                    }
+                    
+                    // Update with new data
+                    const startIdx = Math.max(0, MAX_HISTORY - data.length);
+                    for (let i = 0; i < data.length && i < MAX_HISTORY; i++) {
+                        chartData[startIdx + i] = data[i];
+                    }
+                    
+                    chart.update('none');
+                });
             }
 
-            // ===== UPDATE UI =====
-            function updateUI() {
-                // Update stat values
-                document.getElementById('tempValue').textContent = sensorData.temperature.toFixed(1) + '°C';
-                document.getElementById('presValue').textContent = sensorData.pressure.toFixed(1) + ' hPa';
-                document.getElementById('airValue').textContent = sensorData.airQuality.toFixed(0) + ' AQI';
-                document.getElementById('lightValue').textContent = sensorData.light.toFixed(0) + ' lux';
+            // ===== STATUS UPDATES =====
+            function updateStatus(type, isOnline) {
+                const statusMap = {
+                    'mqtt': { dot: 'mqttStatus', text: 'mqttStatusText', label: 'MQTT' },
+                    'esp': { dot: 'espStatus', text: 'espStatusText', label: 'ESP32' },
+                    'api': { dot: 'apiStatus', text: 'apiStatusText', label: 'API' },
+                    'ws': { dot: 'apiStatus', text: 'apiStatusText', label: 'WebSocket' }
+                };
 
-                // Update min/max
-                document.getElementById('tempMin').textContent = minMax.temperature.min.toFixed(1);
-                document.getElementById('tempMax').textContent = minMax.temperature.max.toFixed(1);
-                document.getElementById('presMin').textContent = minMax.pressure.min.toFixed(1);
-                document.getElementById('presMax').textContent = minMax.pressure.max.toFixed(1);
-                document.getElementById('lightMin').textContent = minMax.light.min.toFixed(0);
-                document.getElementById('lightMax').textContent = minMax.light.max.toFixed(0);
+                const config = statusMap[type];
+                if (!config) return;
 
-                // Update charts
-                updateChart('tempChart', sensorData.temperature);
-                updateChart('presChart', sensorData.pressure);
-                updateChart('airChart', sensorData.airQuality);
-                updateChart('lightChart', sensorData.light);
-            }
-
-            // ===== SIMULATE SENSOR DATA =====
-            function simulateSensor() {
-                // Generate realistic sensor variations
-                sensorData.temperature = 20 + Math.random() * 8;
-                sensorData.pressure = 1005 + Math.random() * 20;
-                sensorData.airQuality = 50 + Math.random() * 50;
-                sensorData.light = 200 + Math.random() * 300;
-
-                // Update min/max
-                minMax.temperature.min = Math.min(minMax.temperature.min, sensorData.temperature);
-                minMax.temperature.max = Math.max(minMax.temperature.max, sensorData.temperature);
-                minMax.pressure.min = Math.min(minMax.pressure.min, sensorData.pressure);
-                minMax.pressure.max = Math.max(minMax.pressure.max, sensorData.pressure);
-                minMax.light.min = Math.min(minMax.light.min, sensorData.light);
-                minMax.light.max = Math.max(minMax.light.max, sensorData.light);
-
-                updateUI();
-
-                // Add MQTT message
-                if (!mqttPaused) {
-                    const topics = [
-                        `Temperature: ${sensorData.temperature.toFixed(1)}°C`,
-                        `Pressure: ${sensorData.pressure.toFixed(1)}hPa`,
-                        `Air Quality: ${sensorData.airQuality.toFixed(0)}AQI`,
-                        `Light: ${sensorData.light.toFixed(0)}lux`
-                    ];
-                    const msg = topics[Math.floor(Math.random() * topics.length)];
-                    addMqttMessage('esp/sensor', msg);
+                const dot = document.getElementById(config.dot);
+                const text = document.getElementById(config.text);
+                if (dot) {
+                    dot.className = `status-dot ${isOnline ? 'online' : 'offline'}`;
+                }
+                if (text) {
+                    text.textContent = isOnline ? 'Online' : 'Offline';
                 }
             }
 
             // ===== MQTT MONITOR =====
-            let mqttPaused = false;
-
             function addMqttMessage(topic, payload, qos = 1) {
                 const terminal = document.getElementById('mqttTerminal');
                 const time = new Date().toLocaleTimeString();
+                
+                // Remove loading message
+                const loading = terminal.querySelector('.loading');
+                if (loading) loading.remove();
+
                 const line = document.createElement('div');
                 line.className = 'mqtt-line';
                 line.innerHTML = `
@@ -713,17 +901,39 @@
                 }
             }
 
+            // ===== POLLING FALLBACK =====
+            async function pollSensors() {
+                const data = await api.fetchSensors();
+                if (data) {
+                    updateSensorData(data);
+                    updateStatus('api', true);
+                    if (!state.isConnected) {
+                        state.isConnected = true;
+                        addMqttMessage('system', 'Connected to API');
+                    }
+                } else {
+                    updateStatus('api', false);
+                    state.isConnected = false;
+                }
+            }
+
             // ===== CONTROLS =====
             document.querySelectorAll('.control-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', async function() {
                     const cmd = this.dataset.cmd;
-                    const label = this.textContent.trim();
                     addMqttMessage('esp/cmd', cmd);
+                    
                     // Visual feedback
                     this.style.transform = 'scale(0.95)';
                     setTimeout(() => { this.style.transform = 'scale(1)'; }, 100);
-                    // Log
-                    console.log(`Command sent: ${cmd}`);
+                    
+                    // Send to backend
+                    const result = await api.sendControl(cmd);
+                    if (result) {
+                        addMqttMessage('system', `Command "${cmd}" executed successfully`);
+                    } else {
+                        addMqttMessage('system', `Command "${cmd}" failed`);
+                    }
                 });
             });
 
@@ -733,27 +943,44 @@
             });
 
             document.getElementById('pauseMqtt').addEventListener('click', function() {
-                mqttPaused = !mqttPaused;
-                this.innerHTML = mqttPaused ? '<i class="fas fa-play"></i> Resume' : '<i class="fas fa-pause"></i> Pause';
+                state.mqttPaused = !state.mqttPaused;
+                this.innerHTML = state.mqttPaused ? '<i class="fas fa-play"></i> Resume' : '<i class="fas fa-pause"></i> Pause';
             });
 
+            // ===== TIME =====
+            function updateClock() {
+                const now = new Date();
+                document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
             // ===== INIT =====
-            // Initial data load
-            updateUI();
+            async function init() {
+                // Connect WebSocket
+                connectWebSocket();
 
-            // Start simulation
-            setInterval(simulateSensor, 1500);
+                // Initial data fetch
+                await pollSensors();
 
-            // Initial MQTT messages
-            setTimeout(() => {
-                addMqttMessage('esp/sensor', 'Temperature: 22.5°C');
-                addMqttMessage('esp/sensor', 'Pressure: 1012.3hPa');
-                addMqttMessage('esp/sensor', 'Air Quality: 82AQI');
-            }, 500);
+                // Set up polling interval (fallback if WebSocket fails)
+                setInterval(pollSensors, 5000);
 
-            console.log('🚀 ESP32 Dashboard ready!');
-            console.log('📡 MQTT Broker: 100.84.169.93:1883');
-            console.log('📊 Sensors: Temperature, Pressure, Air Quality, Light');
+                // Check ESP32 status periodically
+                setInterval(async () => {
+                    const status = await api.fetchStatus();
+                    if (status) {
+                        updateStatus('esp', status.esp32_online);
+                        updateStatus('mqtt', status.mqtt_connected);
+                    }
+                }, 10000);
+
+                console.log('🚀 ESP32 Dashboard connected to Rust backend!');
+                console.log(`📡 API: ${API_CONFIG.baseUrl}`);
+            }
+
+            // Start the application
+            init();
 
         })();
     </script>
