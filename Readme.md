@@ -79,6 +79,7 @@ HomeAutomation/
 │   └── Cargo.lock
 |
 |──Index.html
+|──simulation.html
 │
 └── README.md
 ```
@@ -88,13 +89,28 @@ HomeAutomation/
 ### Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd Home-Automation-System
+git clone https://github.com/newton-f150/Home-Automation.git
+cd Home-Automation
 ```
 
 ### Configure PostgreSQL
 
-Create a PostgreSQL database and update your environment variables.
+Create a PostgreSQL database.
+
+```sql
+CREATE DATABASE homeAutomation;
+```
+
+Run Database Migration.
+```sql
+\i path/to/migrations/001_initial.sql
+```
+
+Insert Sample Data into the Database.
+```sql
+\i path/to/migrations/data.sql
+```
+Update your environment variables.
 
 ```env
 DATABASE_URL=postgres://username:password@localhost/home_automation
@@ -124,16 +140,3 @@ Open the Arduino IDE, configure Wi-Fi and MQTT settings, then upload the firmwar
 * Historical data visualization
 * Custom date-range queries
 * Real-time device status updates
-
-## Future Improvements
-
-* Mobile application
-* User authentication
-* Role-based access control
-* Automation rules and scheduling
-* Energy usage analytics
-* Voice assistant integration
-
-## License
-
-This project is intended for educational and research purposes.
