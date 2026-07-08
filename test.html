@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32 Sensor Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ===== GRAFANA DARK THEME ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: #0a0e1a;
+            color: #d4d7de;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ===== TOP BAR ===== */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: #151b2b;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid #2a3040;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 20px;
+            color: #f0f2f5;
+        }
+
+        .logo i {
+            color: #f5a623;
+            font-size: 24px;
+        }
+
+        .status-indicators {
+            display: flex;
+            gap: 18px;
+            font-size: 13px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #1e2538;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #2a3040;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.online { background: #10b981; box-shadow: 0 0 8px #10b98166; }
+        .status-dot.offline { background: #ef4444; }
+        .status-dot.warning { background: #f59e0b; }
+
+        .time-display {
+            font-size: 14px;
+            color: #9ca3af;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== DASHBOARD GRID ===== */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 18px 20px;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            font-size: 20px;
+            opacity: 0.7;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #f0f2f5;
+            margin-bottom: 4px;
+        }
+
+        .stat-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #1e2538;
+            padding-top: 8px;
+        }
+
+        .trend-up { color: #10b981; }
+        .trend-down { color: #ef4444; }
+
+        /* ===== CHARTS ===== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .chart-card:hover {
+            border-color: #3b82f6;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .chart-wrapper {
+            height: 180px;
+            position: relative;
+        }
+
+        /* ===== CONTROLS ===== */
+        .controls-section {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .controls-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #f0f2f5;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .control-btn {
+            background: #1e2538;
+            border: 1px solid #2a3040;
+            color: #d4d7de;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .control-btn:hover {
+            background: #2a3040;
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+        }
+
+        .control-btn.primary {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+
+        .control-btn.primary:hover {
+            background: #2563eb;
+        }
+
+        .control-btn.success {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+
+        .control-btn.success:hover {
+            background: #059669;
+        }
+
+        .control-btn.danger {
+            background: #ef4444;
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .control-btn.danger:hover {
+            background: #dc2626;
+        }
+
+        .control-btn.warning {
+            background: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+        }
+
+        .control-btn.warning:hover {
+            background: #d97706;
+        }
+
+        .control-btn i {
+            font-size: 14px;
+        }
+
+        /* ===== MQTT MONITOR ===== */
+        .mqtt-section {
+            background: #151b2b;
+            border: 1px solid #2a3040;
+            border-radius: 12px;
+            padding: 20px 24px;
+        }
+
+        .mqtt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .mqtt-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #f0f2f5;
+        }
+
+        .mqtt-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .mqtt-controls button {
+            background: #1e2538;
+            border: 1px solid #2a3040;
+            color: #d4d7de;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .mqtt-controls button:hover {
+            background: #2a3040;
+        }
+
+        .mqtt-terminal {
+            background: #0a0e1a;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border: 1px solid #1e2538;
+        }
+
+        .mqtt-line {
+            display: flex;
+            gap: 16px;
+            padding: 4px 0;
+            border-bottom: 1px solid #111827;
+            font-size: 12px;
+        }
+
+        .mqtt-line .time {
+            color: #6b7280;
+            min-width: 80px;
+        }
+
+        .mqtt-line .topic {
+            color: #60a5fa;
+            min-width: 120px;
+        }
+
+        .mqtt-line .payload {
+            color: #d4d7de;
+            flex: 1;
+        }
+
+        .mqtt-line .qos {
+            color: #f59e0b;
+            min-width: 40px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1200px) {
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .topbar { flex-direction: column; align-items: stretch; }
+            .status-indicators { flex-wrap: wrap; }
+            .controls-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .controls-grid { grid-template-columns: 1fr; }
+            .stat-value { font-size: 22px; }
+        }
+
+        /* Scrollbar */
+        .mqtt-terminal::-webkit-scrollbar {
+            width: 4px;
+        }
+        .mqtt-terminal::-webkit-scrollbar-track {
+            background: #0a0e1a;
+        }
+        .mqtt-terminal::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="logo">
+                <i class="fas fa-microchip"></i>
+                <span>Remote Monitoring Esp32</span>
+            </div>
+        </div>
+        <div class="status-indicators">
+            <!-- <div class="status-item">
+                <span class="status-dot online" id="mqttStatus"></span>
+                <span>MQTT <span id="mqttStatusText">Connected</span></span>
+            </div> -->
+            <!-- <div class="status-item">
+                <span class="status-dot online" id="espStatus"></span>
+                <span>ESP32 <span id="espStatusText">Online</span></span>
+            </div> -->
+            <div class="status-item">
+                <span class="status-dot online" id="apiStatus"></span>
+                <span>API Status: <span id="apiStatusText">Online</span></span>
+            </div>
+            <span class="time-display" id="currentTime">--:--:--</span>
+        </div>
+    </header>
+
+    <!-- STAT CARDS -->
+    <div class="dashboard-grid" id="statCards">
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Temperature</span>
+                <i class="fas fa-thermometer-half stat-icon" style="color: #f59e0b;"></i>
+            </div>
+            <div class="stat-value" id="tempValue">--</div>
+            <div class="stat-footer">
+                <span>Min: <span id="tempMin">--</span>°C</span>
+                <span>Max: <span id="tempMax">--</span>°C</span>
+                <span class="trend-up" id="tempTrend"><i class="fas fa-arrow-up"></i> 0.0°C</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Pressure</span>
+                <i class="fas fa-compress-alt stat-icon" style="color: #8b5cf6;"></i>
+            </div>
+            <div class="stat-value" id="presValue">--</div>
+            <div class="stat-footer">
+                <span>Min: <span id="presMin">--</span>hPa</span>
+                <span>Max: <span id="presMax">--</span>hPa</span>
+                <span class="trend-up" id="presTrend"><i class="fas fa-arrow-up"></i> 0.0hPa</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Air Quality</span>
+                <i class="fas fa-wind stat-icon" style="color: #10b981;"></i>
+            </div>
+            <div class="stat-value" id="airValue">--</div>
+            <div class="stat-footer">
+                <span>Status: <span id="airStatus">Good</span></span>
+                <span>PM2.5: <span id="airPM">--</span>µg</span>
+                <span class="trend-up" id="airTrend"><i class="fas fa-arrow-up"></i> 0%</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <span class="stat-label">Light</span>
+                <i class="fas fa-sun stat-icon" style="color: #fbbf24;"></i>
+            </div>
+            <div class="stat-value" id="lightValue">--</div>
+            <div class="stat-footer">
+                <span>Min: <span id="lightMin">--</span>lux</span>
+                <span>Max: <span id="lightMax">--</span>lux</span>
+                <span class="trend-up" id="lightTrend"><i class="fas fa-arrow-up"></i> 0lux</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-thermometer-half" style="margin-right: 6px;"></i>Temperature</div>
+            <div class="chart-wrapper"><canvas id="tempChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-compress-alt" style="margin-right: 6px;"></i>Pressure</div>
+            <div class="chart-wrapper"><canvas id="presChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-wind" style="margin-right: 6px;"></i>Air Quality</div>
+            <div class="chart-wrapper"><canvas id="airChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-sun" style="margin-right: 6px;"></i>Light</div>
+            <div class="chart-wrapper"><canvas id="lightChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls-section">
+        <div class="controls-header">
+            <h3><i class="fas fa-sliders-h" style="margin-right: 8px;"></i>Device Controls</h3>
+            <span style="font-size: 12px; color: #6b7280;">MQTT: esp/cmd</span>
+        </div>
+        <div class="controls-grid">
+            <button class="control-btn primary" data-cmd="LIGHT_ON"><i class="fas fa-lightbulb"></i> Lights ON</button>
+            <button class="control-btn" data-cmd="LIGHT_OFF"><i class="fas fa-lightbulb"></i> Lights OFF</button>
+            <button class="control-btn success" data-cmd="FAN_ON"><i class="fas fa-fan"></i> Fan ON</button>
+            <button class="control-btn" data-cmd="FAN_OFF"><i class="fas fa-fan"></i> Fan OFF</button>
+            <button class="control-btn warning" data-cmd="RESTART"><i class="fas fa-sync-alt"></i> Restart ESP32</button>
+            <button class="control-btn danger" data-cmd="STOP"><i class="fas fa-stop-circle"></i> Emergency Stop</button>
+        </div>
+    </div>
+
+    <!-- MQTT MONITOR -->
+    <div class="mqtt-section">
+        <div class="mqtt-header">
+            <h3><i class="fas fa-exchange-alt" style="margin-right: 8px;"></i>MQTT Monitor</h3>
+            <div class="mqtt-controls">
+                <span style="font-size: 12px; color: #6b7280;">Topic: esp/sensor</span>
+                <button id="clearMqtt"><i class="fas fa-eraser"></i> Clear</button>
+                <button id="pauseMqtt"><i class="fas fa-pause"></i> Pause</button>
+            </div>
+        </div>
+        <div class="mqtt-terminal" id="mqttTerminal">
+            <div class="loading">Waiting for data...</div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        const API_CONFIG = {
+            baseUrl: '/api', // Update with your Rust backend URL
+            endpoints: {
+                sensors: '/sensors',
+                control: '/control',
+                status: '/status'
+            }
+        };
+
+        // ===== MAIN APPLICATION =====
+        (function() {
+            'use strict';
+
+            // ===== STATE =====
+            const state = {
+                sensorData: {
+                    temperature: 0,
+                    pressure: 0,
+                    airQuality: 0,
+                    light: 0
+                },
+                minMax: {
+                    temperature: { min: Infinity, max: -Infinity },
+                    pressure: { min: Infinity, max: -Infinity },
+                    light: { min: Infinity, max: -Infinity }
+                },
+                history: {
+                    temperature: [],
+                    pressure: [],
+                    airQuality: [],
+                    light: []
+                },
+                mqttPaused: false,
+                isConnected: false
+            };
+
+            const MAX_HISTORY = 30;
+
+            // ===== API CLIENT =====
+            const api = {
+                async fetchSensors() {
+                    try {
+                        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.sensors}`);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Failed to fetch sensor data:', error);
+                        return null;
+                    }
+                },
+
+                async sendControl(command) {
+                    try {
+                        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.control}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command })
+                        });
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Failed to send control command:', error);
+                        return null;
+                    }
+                },
+
+                async fetchStatus() {
+                    try {
+                        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.status}`);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Failed to fetch status:', error);
+                        return null;
+                    }
+                }
+            };
+
+            // ===== WEBSOCKET CONNECTION =====
+            let ws = null;
+            let wsReconnectTimer = null;
+
+            function connectWebSocket() {
+                try {
+                    const wsUrl = API_CONFIG.baseUrl.replace('http', 'ws') + '/ws';
+                    ws = new WebSocket(wsUrl);
+
+                    ws.onopen = function() {
+                        console.log('WebSocket connected');
+                        updateStatus('ws', true);
+                        addMqttMessage('system', 'WebSocket connected');
+                    };
+
+                    ws.onmessage = function(event) {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'sensor') {
+                                updateSensorData(data.payload);
+                            } else if (data.type === 'mqtt') {
+                                addMqttMessage(data.topic || 'mqtt', data.payload);
+                            }
+                        } catch (e) {
+                            console.error('WebSocket message error:', e);
+                        }
+                    };
+
+                    ws.onclose = function() {
+                        console.log('WebSocket disconnected');
+                        updateStatus('ws', false);
+                        addMqttMessage('system', 'WebSocket disconnected - reconnecting...');
+                        scheduleReconnect();
+                    };
+
+                    ws.onerror = function(error) {
+                        console.error('WebSocket error:', error);
+                        updateStatus('ws', false);
+                    };
+                } catch (error) {
+                    console.error('WebSocket connection error:', error);
+                    scheduleReconnect();
+                }
+            }
+
+            function scheduleReconnect() {
+                if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = setTimeout(() => {
+                    console.log('Attempting WebSocket reconnect...');
+                    connectWebSocket();
+                }, 3000);
+            }
+
+            // ===== UPDATE SENSOR DATA =====
+            function updateSensorData(data) {
+                // Update values
+                if (data.temperature !== undefined) {
+                    state.sensorData.temperature = data.temperature;
+                    updateMinMax('temperature', data.temperature);
+                }
+                if (data.pressure !== undefined) {
+                    state.sensorData.pressure = data.pressure;
+                    updateMinMax('pressure', data.pressure);
+                }
+                if (data.airQuality !== undefined) {
+                    state.sensorData.airQuality = data.airQuality;
+                }
+                if (data.light !== undefined) {
+                    state.sensorData.light = data.light;
+                    updateMinMax('light', data.light);
+                }
+
+                // Update history
+                if (data.temperature !== undefined) {
+                    state.history.temperature.push(data.temperature);
+                    if (state.history.temperature.length > MAX_HISTORY) state.history.temperature.shift();
+                }
+                if (data.pressure !== undefined) {
+                    state.history.pressure.push(data.pressure);
+                    if (state.history.pressure.length > MAX_HISTORY) state.history.pressure.shift();
+                }
+                if (data.airQuality !== undefined) {
+                    state.history.airQuality.push(data.airQuality);
+                    if (state.history.airQuality.length > MAX_HISTORY) state.history.airQuality.shift();
+                }
+                if (data.light !== undefined) {
+                    state.history.light.push(data.light);
+                    if (state.history.light.length > MAX_HISTORY) state.history.light.shift();
+                }
+
+                updateUI();
+                updateCharts();
+            }
+
+            function updateMinMax(sensor, value) {
+                const mm = state.minMax[sensor];
+                if (!mm) return;
+                if (value < mm.min) mm.min = value;
+                if (value > mm.max) mm.max = value;
+            }
+
+            // ===== UPDATE UI =====
+            function updateUI() {
+                const data = state.sensorData;
+                const mm = state.minMax;
+
+                // Temperature
+                document.getElementById('tempValue').textContent = data.temperature.toFixed(1) + '°C';
+                document.getElementById('tempMin').textContent = mm.temperature.min.toFixed(1);
+                document.getElementById('tempMax').textContent = mm.temperature.max.toFixed(1);
+                updateTrend('tempTrend', data.temperature);
+
+                // Pressure
+                document.getElementById('presValue').textContent = data.pressure.toFixed(1) + ' hPa';
+                document.getElementById('presMin').textContent = mm.pressure.min.toFixed(1);
+                document.getElementById('presMax').textContent = mm.pressure.max.toFixed(1);
+                updateTrend('presTrend', data.pressure);
+
+                // Air Quality
+                document.getElementById('airValue').textContent = data.airQuality.toFixed(0) + ' AQI';
+                const airStatus = data.airQuality < 50 ? 'Good' : data.airQuality < 100 ? 'Moderate' : 'Unhealthy';
+                document.getElementById('airStatus').textContent = airStatus;
+                document.getElementById('airPM').textContent = (data.airQuality * 0.15).toFixed(1);
+                updateTrend('airTrend', data.airQuality);
+
+                // Light
+                document.getElementById('lightValue').textContent = data.light.toFixed(0) + ' lux';
+                document.getElementById('lightMin').textContent = mm.light.min.toFixed(0);
+                document.getElementById('lightMax').textContent = mm.light.max.toFixed(0);
+                updateTrend('lightTrend', data.light);
+            }
+
+            function updateTrend(elementId, currentValue) {
+                const element = document.getElementById(elementId);
+                if (!element) return;
+                // Simple trend calculation based on last two values
+                const key = elementId.replace('Trend', '');
+                const history = state.history[key.toLowerCase()];
+                if (history && history.length >= 2) {
+                    const prev = history[history.length - 2];
+                    const diff = currentValue - prev;
+                    const arrow = diff >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const className = diff >= 0 ? 'trend-up' : 'trend-down';
+                    element.className = className;
+                    element.innerHTML = `<i class="fas ${arrow}"></i> ${Math.abs(diff).toFixed(1)}`;
+                }
+            }
+
+            // ===== CHARTS =====
+            const chartConfigs = {
+                tempChart: { label: 'Temperature °C', color: '#f59e0b', unit: '°C' },
+                presChart: { label: 'Pressure hPa', color: '#8b5cf6', unit: 'hPa' },
+                airChart: { label: 'Air Quality', color: '#10b981', unit: 'AQI' },
+                lightChart: { label: 'Light lux', color: '#fbbf24', unit: 'lux' }
+            };
+
+            const charts = {};
+
+            function initChart(canvasId, config) {
+                const ctx = document.getElementById(canvasId)?.getContext('2d');
+                if (!ctx) return null;
+
+                const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+                gradient.addColorStop(0, config.color + '50');
+                gradient.addColorStop(1, config.color + '05');
+
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: Array(MAX_HISTORY).fill(''),
+                        datasets: [{
+                            label: config.label,
+                            data: Array(MAX_HISTORY).fill(0),
+                            borderColor: config.color,
+                            backgroundColor: gradient,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 1.5,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.parsed.y.toFixed(1) + ' ' + config.unit;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: {
+                                display: true,
+                                grid: { color: '#1e2538', drawBorder: false },
+                                ticks: { color: '#6b7280', font: { size: 9 } }
+                            }
+                        },
+                        animation: { duration: 200 }
+                    }
+                });
+                return chart;
+            }
+
+            // Initialize all charts
+            Object.keys(chartConfigs).forEach(id => {
+                charts[id] = initChart(id, chartConfigs[id]);
+            });
+
+            function updateCharts() {
+                const chartMap = {
+                    tempChart: 'temperature',
+                    presChart: 'pressure',
+                    airChart: 'airQuality',
+                    lightChart: 'light'
+                };
+
+                Object.keys(chartMap).forEach(chartId => {
+                    const chart = charts[chartId];
+                    if (!chart) return;
+                    const sensorKey = chartMap[chartId];
+                    const data = state.history[sensorKey] || [];
+                    const chartData = chart.data.datasets[0].data;
+                    
+                    // Fill with zeros if not enough data
+                    while (chartData.length < MAX_HISTORY) {
+                        chartData.push(0);
+                    }
+                    
+                    // Update with new data
+                    const startIdx = Math.max(0, MAX_HISTORY - data.length);
+                    for (let i = 0; i < data.length && i < MAX_HISTORY; i++) {
+                        chartData[startIdx + i] = data[i];
+                    }
+                    
+                    chart.update('none');
+                });
+            }
+
+            // ===== STATUS UPDATES =====
+            function updateStatus(type, isOnline) {
+                const statusMap = {
+                    'mqtt': { dot: 'mqttStatus', text: 'mqttStatusText', label: 'MQTT' },
+                    'esp': { dot: 'espStatus', text: 'espStatusText', label: 'ESP32' },
+                    'api': { dot: 'apiStatus', text: 'apiStatusText', label: 'API' },
+                    'ws': { dot: 'apiStatus', text: 'apiStatusText', label: 'WebSocket' }
+                };
+
+                const config = statusMap[type];
+                if (!config) return;
+
+                const dot = document.getElementById(config.dot);
+                const text = document.getElementById(config.text);
+                if (dot) {
+                    dot.className = `status-dot ${isOnline ? 'online' : 'offline'}`;
+                }
+                if (text) {
+                    text.textContent = isOnline ? 'Online' : 'Offline';
+                }
+            }
+
+            // ===== MQTT MONITOR =====
+            function addMqttMessage(topic, payload, qos = 1) {
+                const terminal = document.getElementById('mqttTerminal');
+                const time = new Date().toLocaleTimeString();
+                
+                // Remove loading message
+                const loading = terminal.querySelector('.loading');
+                if (loading) loading.remove();
+
+                const line = document.createElement('div');
+                line.className = 'mqtt-line';
+                line.innerHTML = `
+                    <span class="time">${time}</span>
+                    <span class="topic">${topic}</span>
+                    <span class="payload">${payload}</span>
+                    <span class="qos">QoS ${qos}</span>
+                `;
+                terminal.prepend(line);
+                if (terminal.children.length > 50) {
+                    terminal.removeChild(terminal.lastChild);
+                }
+            }
+
+            // ===== POLLING FALLBACK =====
+            async function pollSensors() {
+                const data = await api.fetchSensors();
+                if (data) {
+                    updateSensorData(data);
+                    updateStatus('api', true);
+                    if (!state.isConnected) {
+                        state.isConnected = true;
+                        addMqttMessage('system', 'Connected to API');
+                    }
+                } else {
+                    updateStatus('api', false);
+                    state.isConnected = false;
+                }
+            }
+
+            // ===== CONTROLS =====
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const cmd = this.dataset.cmd;
+                    addMqttMessage('esp/cmd', cmd);
+                    
+                    // Visual feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => { this.style.transform = 'scale(1)'; }, 100);
+                    
+                    // Send to backend
+                    const result = await api.sendControl(cmd);
+                    if (result) {
+                        addMqttMessage('system', `Command "${cmd}" executed successfully`);
+                    } else {
+                        addMqttMessage('system', `Command "${cmd}" failed`);
+                    }
+                });
+            });
+
+            // ===== MQTT CONTROLS =====
+            document.getElementById('clearMqtt').addEventListener('click', () => {
+                document.getElementById('mqttTerminal').innerHTML = '';
+            });
+
+            document.getElementById('pauseMqtt').addEventListener('click', function() {
+                state.mqttPaused = !state.mqttPaused;
+                this.innerHTML = state.mqttPaused ? '<i class="fas fa-play"></i> Resume' : '<i class="fas fa-pause"></i> Pause';
+            });
+
+            // ===== TIME =====
+            function updateClock() {
+                const now = new Date();
+                document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            // ===== INIT =====
+            async function init() {
+                // Connect WebSocket
+                connectWebSocket();
+
+                // Initial data fetch
+                await pollSensors();
+
+                // Set up polling interval (fallback if WebSocket fails)
+                setInterval(pollSensors, 5000);
+
+                // Check ESP32 status periodically
+                setInterval(async () => {
+                    const status = await api.fetchStatus();
+                    if (status) {
+                        updateStatus('esp', status.esp32_online);
+                        updateStatus('mqtt', status.mqtt_connected);
+                    }
+                }, 10000);
+
+                console.log('🚀 ESP32 Dashboard connected to Rust backend!');
+                console.log(`📡 API: ${API_CONFIG.baseUrl}`);
+            }
+
+            // Start the application
+            init();
+
+        })();
+    </script>
+
+</body>
+</html>
