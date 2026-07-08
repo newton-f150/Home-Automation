@@ -98,7 +98,7 @@ cd Home-Automation
 Create a PostgreSQL database.
 
 ```sql
-CREATE DATABASE homeAutomation;
+CREATE DATABASE home_automation;
 ```
 
 Run Database Migration.
