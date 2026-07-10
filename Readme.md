@@ -4,6 +4,51 @@
 
 This project is a smart home automation system built using an ESP32 microcontroller and a Raspberry Pi or pc as the Edge Device. The system monitors environmental conditions, allows remote control of connected devices, and stores sensor data for future analysis in a Postgres Database.
 
+# Dashboard
+
+## Overview
+
+![Dashboard Overview](docs/images/dashboard-overview.png)
+
+The main dashboard displays connected devices, live sensor readings, and recent activity.
+
+---
+
+## Device Control
+
+![Device Control](docs/images/device-control.png)
+
+Control LEDs, servo motors, and other connected devices in real time.
+
+---
+
+## Live Monitoring
+
+![Live Monitoring](docs/images/live-monitoring.png)
+
+View live telemetry streamed over MQTT and WebSockets.
+
+---
+
+## Historical Data
+
+![Historical Data](docs/images/history.png)
+
+Explore historical sensor readings with interactive charts and date filtering.
+
+---
+
+## Simulation
+
+![Simulation](docs/images/simulation.png)
+
+Test devices and automations using the built-in simulator.
+
+
+
+
+
+
 ## Features
 
 * Real-time monitoring of sensor data
