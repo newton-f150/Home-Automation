@@ -8,7 +8,7 @@ This project is a smart home automation system built using an ESP32 microcontrol
 
 ## Overview
 
-![Dashboard Overview](docs/images/dashboard-overview.png)
+![Dashboard Overview](images/dashboard-overview.png)
 
 The main dashboard displays connected devices, live sensor readings, and recent activity.
 
