@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
         .parse()?;
     let addr: SocketAddr = format!("{host}:{port}").parse()?;
 
-    info!("🚀 Server listening on http://{addr}");
+    info!("Server listening on http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 
