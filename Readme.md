@@ -6,48 +6,27 @@ This project is a smart home automation system built using an ESP32 microcontrol
 
 # Dashboard
 
-## Overview
+## Main Dashboard
 
-![Dashboard Overview](images/top-dashboard.png)
+![Main Dashboard](images/top-dashboard.png)
 
-The main dashboard displays connected devices, live sensor readings, and recent activity.
-
----
-
-## Device Control
-
-![Device Control](docs/images/device-control.png)
-
-Control LEDs, servo motors, and other connected devices in real time.
+The main dashboard provides an overview of connected devices, sensor readings, and system status.
 
 ---
 
-## Live Monitoring
+## Device Control & Monitoring
 
-![Live Monitoring](docs/images/live-monitoring.png)
+![Device Control](images/bottom-dashboard.png)
 
-View live telemetry streamed over MQTT and WebSockets.
-
----
-
-## Historical Data
-
-![Historical Data](docs/images/history.png)
-
-Explore historical sensor readings with interactive charts and date filtering.
+Monitor environmental conditions, control connected devices, and view system activity in real time.
 
 ---
 
-## Simulation
+## Technology Stack
 
-![Simulation](docs/images/simulation.png)
+![Rust Backend](images/rust.png)
 
-Test devices and automations using the built-in simulator.
-
-
-
-
-
+The backend is built with Rust using Axum, Tokio, SQLx, PostgreSQL, MQTT, and WebSockets.
 
 ## Features
 
