@@ -6,9 +6,13 @@
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const char *ssid = WIFI_SSID;
-const char *password = WIFI_PASSWORD;
-const char *mqtt_server = MQTT_SERVER;
+// const char *ssid = WIFI_SSID;
+// const char *password = WIFI_PASSWORD;
+// const char *mqtt_server = MQTT_SERVER;
+
+const char * ssid = "NezaLlc";
+const char * password = "Neza@net11";
+const char * mqtt_server = "100.84.169.93";
 
 
 const int tempPin = 32;
