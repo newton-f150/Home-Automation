@@ -2,7 +2,8 @@
 
 ## Overview
 
-This project is a smart home automation system built using an ESP32 microcontroller and a Raspberry Pi or pc as the Edge Device. The system monitors environmental conditions, allows remote control of connected devices, and stores sensor data for future analysis in a Postgres Database.
+This project is a smart home automation system built using an ESP32 microcontroller and a Raspberry Pi / pc as the Edge Device.
+The system monitors environmental conditions, allows remote control of connected devices, and stores sensor data for future analysis in a Postgres Database.
 
 # Dashboard
 
