@@ -410,15 +410,7 @@
                 <span>Remote Monitoring Esp32</span>
             </div>
         </div>
-        <div class="status-indicators">
-            <!-- <div class="status-item">
-                <span class="status-dot online" id="mqttStatus"></span>
-                <span>MQTT <span id="mqttStatusText">Connected</span></span>
-            </div> -->
-            <!-- <div class="status-item">
-                <span class="status-dot online" id="espStatus"></span>
-                <span>ESP32 <span id="espStatusText">Online</span></span>
-            </div> -->
+        <div class="status-indicators">    
             <div class="status-item">
                 <span class="status-dot online" id="apiStatus"></span>
                 <span>API Status: <span id="apiStatusText">Online</span></span>
@@ -536,7 +528,7 @@
     <script>
         // ===== CONFIGURATION =====
         const API_CONFIG = {
-            baseUrl: '/api', // Update with your Rust backend URL
+            baseUrl:'http://localhost:3000/api',
             endpoints: {
                 sensors: '/sensors',
                 control: '/control',
